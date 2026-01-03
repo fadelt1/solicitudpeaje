@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solicitud de Peaje</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+    background: linear-gradient(120deg, #1d4350, #a43931);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 18px;
+  }
+
+  .card {
+    background: #fff;
+    width: 100%;
+    max-width: 650px;
+    padding: 26px;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px rgba(0,0,0,.3);
+    overflow: hidden;
+  }
+
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom: 10px;
+  }
+
+  .badge{
+    font-size:12px;
+    font-weight:700;
+    color:#1d4350;
+    background:#eef3f5;
+    border:1px solid #d7e2e6;
+    padding:6px 10px;
+    border-radius:999px;
+    user-select:none;
+  }
+
+  .dots{ display:flex; gap:8px; align-items:center; }
+  .dot{
+    width:10px;height:10px;border-radius:999px;
+    background:#d6dde0;
+  }
+  .dot.active{ background:#1d4350; }
+
+  .step {
+    display: none;
+    animation: fadeSlide .6s ease;
+  }
+  .step.active { display: block; }
+
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  h2 {
+    text-align: center;
+    color: #1d4350;
+    margin: 10px 0 18px;
+  }
+
+  label {
+    font-weight: 600;
+    margin-top: 14px;
+    display: block;
+    color:#1d4350;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 12px;
+    margin-top: 6px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    outline:none;
+  }
+  input:focus, select:focus{
+    border-color:#1d4350;
+    box-shadow: 0 0 0 4px rgba(29,67,80,.12);
+  }
+
+  .row{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px;
+  }
+  @media (max-width: 600px){
+    .row{ grid-template-columns: 1fr; }
+  }
+
+  .actions{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px;
+    margin-top: 22px;
+  }
+
+  button {
+    padding: 14px;
+    width: 100%;
+    background: #1d4350;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  button:hover { background: #163540; }
+
+  .btn-secondary{
+    background:#eef3f5;
+    color:#1d4350;
+    border:1px solid #d7e2e6;
+  }
+  .btn-secondary:hover{
+    background:#e4edef;
+  }
+
+  .hidden { display: none; }
+
+  .error{
+    border-color:#d93025 !important;
+    box-shadow: 0 0 0 4px rgba(217,48,37,.10) !important;
+  }
+  .msg-error{
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:12px;
+    background:#fff3f2;
+    border:1px solid #ffd2cd;
+    color:#a61b12;
+    font-weight:600;
+    display:none;
+  }
+  .msg-error.show{ display:block; }
+
+  .ok{
+    margin-top:12px;
+    font-weight:700;
+    color:#1d4350;
+  }
+
+  .hint{
+    font-size:12px;
+    color:#57707a;
+    margin-top:6px;
+  }
+
+  .btn-loading{
+    opacity:.85;
+    cursor: not-allowed;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <div class="topbar">
+    <div class="badge" id="badgeStep">Paso 1 de 3</div>
+    <div class="dots" aria-label="Progreso">
+      <span class="dot active" id="d1"></span>
+      <span class="dot" id="d2"></span>
+      <span class="dot" id="d3"></span>
+    </div>
+  </div>
+
+  <!-- PASO 1 -->
+  <div class="step active" id="step1">
+    <h2>Tipo de Viaje</h2>
+
+    <label>¿El viaje es?</label>
+    <select id="tipoViaje" required>
+      <option value="">Seleccionar</option>
+      <option value="solo">Solo</option>
+      <option value="dupla">Dupla</option>
+    </select>
+
+    <!-- SOLO -->
+    <div id="choferSolo" class="hidden">
+      <label>Nombre del Chofer</label>
+      <select id="selChoferSolo" disabled>
+        <option value="">Cargando choferes…</option>
+      </select>
+      <div class="hint">Lista cargada desde Firebase</div>
+    </div>
+
+    <!-- DUPLA -->
+    <div id="choferDupla" class="hidden">
+      <label>Chofer 1</label>
+      <select id="selChofer1" disabled>
+        <option value="">Cargando choferes…</option>
+      </select>
+
+      <label>Chofer 2</label>
+      <select id="selChofer2" disabled>
+        <option value="">Cargando choferes…</option>
+      </select>
+
+      <div class="hint">En dupla no se permite seleccionar el mismo chofer 2 veces</div>
+    </div>
+
+    <div class="msg-error" id="err1">Complete el tipo de viaje y seleccione los choferes.</div>
+
+    <div class="actions">
+      <button class="btn-secondary" type="button" disabled>← Atrás</button>
+      <button type="button" id="next1">Siguiente</button>
+    </div>
+  </div>
+
+  <!-- PASO 2 -->
+  <div class="step" id="step2">
+    <h2>Datos del Viaje</h2>
+
+    <div class="row">
+      <div>
+        <label>Número de Móvil</label>
+        <select id="movil" required>
+          <option value="">Seleccionar</option>
+        </select>
+        <div class="hint">Valores permitidos: 730 a 759</div>
+      </div>
+
+      <div>
+        <label>Destino</label>
+        <select id="destino" required>
+          <option value="">Seleccionar</option>
+          <option>CDE</option>
+          <option>ENCAR</option>
+          <option>OVIEDO</option>
+          <option>FORTIN</option>
+          <option>PARESA SANTANI</option>
+          <option>PARESA CTY</option>
+          <option>PARESA CAMPO 9</option>
+          <option>PARESA BOQUERON</option>
+          <option>PARESA CONCEPCION</option>
+          <option>ENVAPAR</option>
+          <option>HEPP</option>
+          <option>ARMIN</option>
+        </select>
+      </div>
+    </div>
+
+    <label>DT (Nº de Remisión / Documento de Traslado)</label>
+    <input id="dt" type="text" placeholder="Ej: DT-000123" required>
+
+    <div class="msg-error" id="err2">Complete Móvil, Destino y DT.</div>
+
+    <div class="actions">
+      <button class="btn-secondary" type="button" id="back2">← Atrás</button>
+      <button type="button" id="next2">Siguiente</button>
+    </div>
+  </div>
+
+  <!-- PASO 3 -->
+  <div class="step" id="step3">
+    <h2>Forma de Cobro del Peaje</h2>
+
+    <label>Seleccione una opción</label>
+    <select id="pago" required>
+      <option value="">Seleccionar</option>
+      <option value="alias">Alias</option>
+      <option value="cuenta">Cuenta Bancaria</option>
+      <option value="efectivo">Efectivo</option>
+    </select>
+
+    <!-- ALIAS -->
+    <div id="alias" class="hidden">
+      <label>Tipo de Alias</label>
+      <select id="tipoAlias">
+        <option value="">Seleccionar</option>
+        <option value="CI">CI</option>
+        <option value="Celular">Número de celular</option>
+        <option value="Correo">Correo electrónico</option>
+      </select>
+
+      <div id="grpCI" class="hidden">
+        <label>CI</label>
+        <input id="aliasCI" type="text" placeholder="Ej: 1234567">
+      </div>
+
+      <div id="grpCel" class="hidden">
+        <label>Número de celular</label>
+        <input id="aliasCel" type="text" placeholder="Ej: 0981123456">
+      </div>
+
+      <div id="grpMail" class="hidden">
+        <label>Correo electrónico</label>
+        <input id="aliasMail" type="email" placeholder="Ej: nombre@correo.com">
+      </div>
+
+      <div class="hint">Compatible con SPI Paraguay • no requiere banco ni número de cuenta</div>
+    </div>
+
+    <!-- CUENTA -->
+    <div id="cuenta" class="hidden">
+      <label>Banco</label>
+      <input id="banco" type="text" placeholder="Ej: Banco Itaú">
+
+      <label>Nº de Cuenta</label>
+      <input id="nroCuenta" type="text" placeholder="Ej: 123456-7">
+
+      <label>Nombre del Titular</label>
+      <input id="titular" type="text" placeholder="Ej: Juan Pérez">
+
+      <label>CI del Titular</label>
+      <input id="ciTitular" type="text" placeholder="Ej: 1234567">
+    </div>
+
+    <!-- EFECTIVO -->
+    <div id="efectivo" class="hidden">
+      <p class="ok">✔ El pago se realizará en efectivo</p>
+      <p class="hint">No se requieren datos adicionales. El pago será físico.</p>
+    </div>
+
+    <div class="msg-error" id="err3">Complete la forma de cobro y los datos requeridos.</div>
+
+    <div class="actions">
+      <button class="btn-secondary" type="button" id="back3">← Atrás</button>
+      <button type="button" id="send">Enviar Solicitud</button>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  // =========================================================
+  // Firebase (2 proyectos)
+  // - qlpchoferes: leer lista de choferes
+  // - usuarios-17923: guardar solicitudes
+  // =========================================================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, get, push, set, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // --------- Firebase A: qlpchoferes (LECTURA choferes) ----------
+  const configChoferes = {
+    apiKey: "AIzaSyBKRJOp6a_izdlwWlciB6AXsd1ZsZjwYRo",
+    authDomain: "qlpchoferes.firebaseapp.com",
+    databaseURL: "https://qlpchoferes-default-rtdb.firebaseio.com",
+    projectId: "qlpchoferes",
+    storageBucket: "qlpchoferes.firebasestorage.app",
+    messagingSenderId: "1028818529138",
+    appId: "1:1028818529138:web:bbc163b4bbe414e2ff8beb",
+    measurementId: "G-ZCZKK6JNRJ"
+  };
+
+  // --------- Firebase B: usuarios-17923 (GUARDAR solicitudes) ----------
+  const configSolicitudes = {
+    apiKey: "AIzaSyAanLqgoFcZvRG5CR8g3njrQu_hCxfU-CE",
+    authDomain: "usuarios-17923.firebaseapp.com",
+    databaseURL: "https://usuarios-17923-default-rtdb.firebaseio.com",
+    projectId: "usuarios-17923",
+    storageBucket: "usuarios-17923.firebasestorage.app",
+    messagingSenderId: "624733094161",
+    appId: "1:624733094161:web:a46bd1c9e4467f19490cb0",
+    measurementId: "G-KRLD87QR30"
+  };
+
+  // Dos apps (nombres distintos)
+  const appChoferes = initializeApp(configChoferes, "appChoferes");
+  const appSolicitudes = initializeApp(configSolicitudes, "appSolicitudes");
+
+  const dbChoferes = getDatabase(appChoferes);
+  const dbSolicitudes = getDatabase(appSolicitudes);
+
+  // ---------------------------------------------------------
+  // UI base
+  // ---------------------------------------------------------
+  const movil = document.getElementById('movil');
+  for (let i = 730; i <= 759; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = String(i);
+    movil.appendChild(opt);
+  }
+
+  let current = 1;
+  function setProgress(step){
+    document.getElementById('badgeStep').textContent = `Paso ${step} de 3`;
+    ['d1','d2','d3'].forEach((id, idx)=>{
+      document.getElementById(id).classList.toggle('active', (idx+1) === step);
+    });
+  }
+  function showStep(step){
+    document.getElementById(`step${current}`).classList.remove('active');
+    document.getElementById(`step${step}`).classList.add('active');
+    current = step;
+    setProgress(step);
+    clearErrors();
+  }
+  function clearErrors(){
+    document.querySelectorAll('.msg-error').forEach(e=>e.classList.remove('show'));
+    document.querySelectorAll('.error').forEach(e=>e.classList.remove('error'));
+  }
+  function markError(el){
+    if(el) el.classList.add('error');
+  }
+
+  function setBtnLoading(btn, loading, text){
+    if(!btn) return;
+    btn.disabled = loading;
+    btn.classList.toggle("btn-loading", loading);
+    btn.textContent = loading ? (text || "Guardando…") : "Enviar Solicitud";
+  }
+
+  // ---------------------------------------------------------
+  // Paso 1: Choferes desde qlpchoferes
+  // ---------------------------------------------------------
+  const tipoViaje = document.getElementById('tipoViaje');
+  const choferSolo = document.getElementById('choferSolo');
+  const choferDupla = document.getElementById('choferDupla');
+
+  const selChoferSolo = document.getElementById('selChoferSolo');
+  const selChofer1 = document.getElementById('selChofer1');
+  const selChofer2 = document.getElementById('selChofer2');
+
+  let drivers = []; // [{name, ci}]
+
+  function setLoadingChoferes(isLoading){
+    const selects = [selChoferSolo, selChofer1, selChofer2];
+    selects.forEach(s=>{
+      s.disabled = isLoading;
+      s.innerHTML = "";
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = isLoading ? "Cargando choferes…" : "Seleccionar";
+      s.appendChild(opt);
+    });
+  }
+
+  function populateChoferSelect(selectEl, excludeCI = null){
+    const currentVal = selectEl.value; // para intentar mantener selección
+    selectEl.innerHTML = "";
+    const first = document.createElement("option");
+    first.value = "";
+    first.textContent = "Seleccionar";
+    selectEl.appendChild(first);
+
+    drivers.forEach(d=>{
+      if(excludeCI && d.ci === excludeCI) return;
+      const opt = document.createElement("option");
+      opt.value = String(d.ci);
+      opt.textContent = `${d.name} — CI: ${d.ci}`;
+      opt.dataset.name = d.name;
+      selectEl.appendChild(opt);
+    });
+
+    if(currentVal) selectEl.value = currentVal;
+  }
+
+  function refreshDuplaExclusions(){
+    const prev1 = selChofer1.value || "";
+    const prev2 = selChofer2.value || "";
+
+    // reconstruye excluyendo el otro
+    selChofer1.value = "";
+    selChofer2.value = "";
+    populateChoferSelect(selChofer1, prev2);
+    populateChoferSelect(selChofer2, prev1);
+
+    // restaura si todavía existe
+    if(prev1) selChofer1.value = prev1;
+    if(prev2) selChofer2.value = prev2;
+  }
+
+  async function loadChoferes(){
+    setLoadingChoferes(true);
+    try{
+      // Tu estructura está en la raíz: /0, /1, /2...
+      const snap = await get(ref(dbChoferes, "/"));
+      const data = snap.val();
+
+      const list = [];
+      if(data && typeof data === "object"){
+        Object.values(data).forEach(item=>{
+          const name = item?.CHOFER;
+          const ci = item?.CI;
+          if(name && ci !== undefined && ci !== null && String(ci).trim() !== ""){
+            list.push({ name: String(name).trim(), ci: String(ci).trim() });
+          }
+        });
+      }
+
+      list.sort((a,b)=> a.name.localeCompare(b.name, 'es', { sensitivity:'base' }));
+      drivers = list;
+
+      setLoadingChoferes(false);
+      populateChoferSelect(selChoferSolo);
+      populateChoferSelect(selChofer1);
+      populateChoferSelect(selChofer2);
+
+    } catch(err){
+      console.error("Error cargando choferes:", err);
+      setLoadingChoferes(false);
+      [selChoferSolo, selChofer1, selChofer2].forEach(s=>{
+        s.innerHTML = `<option value="">Error al cargar choferes</option>`;
+        s.disabled = true;
+      });
+      alert("No se pudo cargar la lista de choferes desde Firebase (qlpchoferes).");
+    }
+  }
+
+  loadChoferes();
+
+  tipoViaje.addEventListener('change', ()=>{
+    choferSolo.classList.add('hidden');
+    choferDupla.classList.add('hidden');
+    if(tipoViaje.value === 'solo') choferSolo.classList.remove('hidden');
+    if(tipoViaje.value === 'dupla') choferDupla.classList.remove('hidden');
+  });
+
+  selChofer1.addEventListener("change", refreshDuplaExclusions);
+  selChofer2.addEventListener("change", refreshDuplaExclusions);
+
+  // ---------------------------------------------------------
+  // Paso 3: Alias / Cuenta / Efectivo
+  // ---------------------------------------------------------
+  const pago = document.getElementById('pago');
+  const aliasBlock = document.getElementById('alias');
+  const cuentaBlock = document.getElementById('cuenta');
+  const efectivoBlock = document.getElementById('efectivo');
+
+  function renderPago(){
+    [aliasBlock, cuentaBlock, efectivoBlock].forEach(b=>b.classList.add('hidden'));
+    if(pago.value === 'alias') aliasBlock.classList.remove('hidden');
+    if(pago.value === 'cuenta') cuentaBlock.classList.remove('hidden');
+    if(pago.value === 'efectivo') efectivoBlock.classList.remove('hidden');
+    if(pago.value === 'alias') renderAliasFields();
+  }
+  pago.addEventListener('change', renderPago);
+
+  const tipoAlias = document.getElementById('tipoAlias');
+  const grpCI = document.getElementById('grpCI');
+  const grpCel = document.getElementById('grpCel');
+  const grpMail = document.getElementById('grpMail');
+
+  const aliasCI = document.getElementById('aliasCI');
+  const aliasCel = document.getElementById('aliasCel');
+  const aliasMail = document.getElementById('aliasMail');
+
+  // ✅ FIX: NO borrar el campo visible. Solo limpiar los que quedan ocultos.
+  function renderAliasFields(){
+    grpCI.classList.add('hidden');
+    grpCel.classList.add('hidden');
+    grpMail.classList.add('hidden');
+
+    if(tipoAlias.value === 'CI'){
+      grpCI.classList.remove('hidden');
+      aliasCel.value = '';
+      aliasMail.value = '';
+    } else if(tipoAlias.value === 'Celular'){
+      grpCel.classList.remove('hidden');
+      aliasCI.value = '';
+      aliasMail.value = '';
+    } else if(tipoAlias.value === 'Correo'){
+      grpMail.classList.remove('hidden');
+      aliasCI.value = '';
+      aliasCel.value = '';
+    } else {
+      // nada seleccionado
+      aliasCI.value = '';
+      aliasCel.value = '';
+      aliasMail.value = '';
+    }
+  }
+  tipoAlias.addEventListener('change', renderAliasFields);
+
+  // ---------------------------------------------------------
+  // Validaciones
+  // ---------------------------------------------------------
+  function valStep1(){
+    clearErrors();
+    let ok = true;
+
+    if(!tipoViaje.value){
+      ok = false;
+      markError(tipoViaje);
+    }
+
+    if(tipoViaje.value === 'solo'){
+      if(selChoferSolo.disabled || !selChoferSolo.value){
+        ok = false;
+        markError(selChoferSolo);
+      }
+    }
+
+    if(tipoViaje.value === 'dupla'){
+      if(selChofer1.disabled || !selChofer1.value){
+        ok = false;
+        markError(selChofer1);
+      }
+      if(selChofer2.disabled || !selChofer2.value){
+        ok = false;
+        markError(selChofer2);
+      }
+      if(selChofer1.value && selChofer2.value && selChofer1.value === selChofer2.value){
+        ok = false;
+        markError(selChofer1);
+        markError(selChofer2);
+      }
+    }
+
+    if(!ok) document.getElementById('err1').classList.add('show');
+    return ok;
+  }
+
+  function valStep2(){
+    clearErrors();
+    let ok = true;
+
+    const destino = document.getElementById('destino');
+    const dt = document.getElementById('dt');
+
+    if(!movil.value){ ok = false; markError(movil); }
+    if(!destino.value){ ok = false; markError(destino); }
+    if(!dt.value.trim()){ ok = false; markError(dt); }
+
+    if(!ok) document.getElementById('err2').classList.add('show');
+    return ok;
+  }
+
+  function valStep3(){
+    clearErrors();
+    let ok = true;
+
+    if(!pago.value){
+      ok = false;
+      markError(pago);
+    }
+
+    if(pago.value === 'alias'){
+      if(!tipoAlias.value){ ok = false; markError(tipoAlias); }
+
+      if(tipoAlias.value === 'CI'){
+        if(!aliasCI.value.trim()){ ok = false; markError(aliasCI); }
+      }
+      if(tipoAlias.value === 'Celular'){
+        if(!aliasCel.value.trim()){ ok = false; markError(aliasCel); }
+      }
+      if(tipoAlias.value === 'Correo'){
+        if(!aliasMail.value.trim()){ ok = false; markError(aliasMail); }
+      }
+    }
+
+    if(pago.value === 'cuenta'){
+      const banco = document.getElementById('banco');
+      const nro = document.getElementById('nroCuenta');
+      const tit = document.getElementById('titular');
+      const ci = document.getElementById('ciTitular');
+
+      if(!banco.value.trim()){ ok = false; markError(banco); }
+      if(!nro.value.trim()){ ok = false; markError(nro); }
+      if(!tit.value.trim()){ ok = false; markError(tit); }
+      if(!ci.value.trim()){ ok = false; markError(ci); }
+    }
+
+    if(!ok) document.getElementById('err3').classList.add('show');
+    return ok;
+  }
+
+  function getSelectedName(selectEl){
+    const opt = selectEl.options[selectEl.selectedIndex];
+    return opt?.dataset?.name || "";
+  }
+
+  function buildPayload(){
+    const payload = {
+      createdAt: serverTimestamp(),
+      tipoViaje: tipoViaje.value,
+      choferSolo: tipoViaje.value === "solo" ? { ci: selChoferSolo.value, nombre: getSelectedName(selChoferSolo) } : null,
+      chofer1: tipoViaje.value === "dupla" ? { ci: selChofer1.value, nombre: getSelectedName(selChofer1) } : null,
+      chofer2: tipoViaje.value === "dupla" ? { ci: selChofer2.value, nombre: getSelectedName(selChofer2) } : null,
+      movil: movil.value,
+      destino: document.getElementById('destino').value,
+      dt: document.getElementById('dt').value.trim(),
+      formaCobro: pago.value,
+      alias: {
+        tipo: tipoAlias.value || "",
+        ci: aliasCI.value.trim(),
+        celular: aliasCel.value.trim(),
+        correo: aliasMail.value.trim()
+      },
+      cuenta: {
+        banco: document.getElementById('banco')?.value?.trim() || "",
+        numero: document.getElementById('nroCuenta')?.value?.trim() || "",
+        titular: document.getElementById('titular')?.value?.trim() || "",
+        ci: document.getElementById('ciTitular')?.value?.trim() || ""
+      }
+    };
+
+    // Limpieza según cobro
+    if(payload.formaCobro !== 'alias') payload.alias = { tipo:"", ci:"", celular:"", correo:"" };
+    if(payload.formaCobro !== 'cuenta') payload.cuenta = { banco:"", numero:"", titular:"", ci:"" };
+
+    // Limpieza alias según tipo
+    if(payload.formaCobro === 'alias'){
+      if(payload.alias.tipo === 'CI'){ payload.alias.celular = ""; payload.alias.correo = ""; }
+      if(payload.alias.tipo === 'Celular'){ payload.alias.ci = ""; payload.alias.correo = ""; }
+      if(payload.alias.tipo === 'Correo'){ payload.alias.ci = ""; payload.alias.celular = ""; }
+    }
+
+    return payload;
+  }
+
+  // ---------------------------------------------------------
+  // Guardar en RTDB usuarios-17923
+  // Ruta: /solicitudes_peajes_interior/{pushId}
+  // ---------------------------------------------------------
+  async function saveToRealtime(payload){
+    const listRef = ref(dbSolicitudes, "solicitudes_peajes_interior");
+    const newRef = push(listRef);
+    await set(newRef, payload);
+    return newRef.key;
+  }
+
+  // ---------------------------------------------------------
+  // Botones
+  // ---------------------------------------------------------
+  document.getElementById('next1').addEventListener('click', ()=>{
+    if(valStep1()) showStep(2);
+  });
+
+  document.getElementById('back2').addEventListener('click', ()=> showStep(1));
+  document.getElementById('next2').addEventListener('click', ()=>{
+    if(valStep2()) showStep(3);
+  });
+
+  document.getElementById('back3').addEventListener('click', ()=> showStep(2));
+
+  const btnSend = document.getElementById('send');
+  btnSend.addEventListener('click', async ()=>{
+    // ✅ FIX: NO llamar renderPago() acá porque puede disparar lógica y afectar inputs
+    if(!valStep3()) return;
+
+    const payload = buildPayload();
+
+    try{
+      setBtnLoading(btnSend, true, "Guardando…");
+      const id = await saveToRealtime(payload);
+
+      alert(
+        "✅ Solicitud guardada en Firebase.\n\n" +
+        "ID: " + id + "\n" +
+        "Móvil: " + payload.movil + "\n" +
+        "Destino: " + payload.destino + "\n" +
+        "DT: " + payload.dt
+      );
+
+      location.reload();
+    } catch(err){
+      console.error("Error guardando solicitud:", err);
+      setBtnLoading(btnSend, false, "Enviar Solicitud");
+      alert("❌ No se pudo guardar en Firebase (usuarios-17923). Revisá rules (escritura) en Realtime Database.");
+    }
+  });
+
+  // Estado inicial
+  setProgress(1);
+  renderPago();
+  renderAliasFields();
+</script>
+
+</body>
+</html>
